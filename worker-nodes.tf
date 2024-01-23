@@ -25,6 +25,32 @@ resource "aws_iam_instance_profile" "eks_worker_instance_profile" {
   role = aws_iam_role.eks_worker_role.name
 }
 
+resource "aws_security_group" "eks_worker_sg" {
+  name        = "eks-workers-sg"
+  description = "Security group for all nodes in the cluster"
+  vpc_id      = aws_vpc.eks_vpc.id
+
+  # Allow inbound communication from the control plane and nodes within the VPC
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["10.0.0.0/16"]  # Adjust this to match your VPC CIDR
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "eks-workers-sg"
+  }
+}
+
 resource "aws_autoscaling_group" "eks_worker_group" {
   desired_capacity     = 2
   max_size             = 3
@@ -53,6 +79,7 @@ resource "aws_launch_configuration" "eks_worker_config" {
   image_id      = data.aws_ami.eks_worker.id  # Use data source to fetch the latest EKS-optimized AMI
   key_name = "eks-worker-nodes"
   iam_instance_profile = aws_iam_instance_profile.eks_worker_instance_profile.name
+  security_groups = [aws_security_group.eks_worker_sg.id]
 
   lifecycle {
     create_before_destroy = true
